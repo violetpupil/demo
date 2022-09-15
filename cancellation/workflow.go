@@ -36,9 +36,9 @@ func Workflow(ctx workflow.Context) error {
 	err := workflow.ExecuteActivity(ctx, a.Main).Get(ctx, &result)
 	if err != nil {
 		logger.Error("main activity error", "error", err)
-	} else {
-		logger.Info("main activity result", "result", result)
+		return err
 	}
+	logger.Info("main activity result", "result", result)
 	logger.Info("workflow complete")
 	return nil
 }
