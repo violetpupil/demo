@@ -16,7 +16,7 @@ func (a *Activities) Main(ctx context.Context) (string, error) {
 		select {
 		case <-time.After(4 * time.Second):
 			logger.Info("heartbeat recording")
-			activity.RecordHeartbeat(ctx, "")
+			activity.RecordHeartbeat(ctx)
 		case <-ctx.Done():
 			logger.Info("context is canceled")
 			return "I am canceled by Done", nil
