@@ -6,6 +6,8 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+type Context = workflow.Context
+
 const Queue = "demo-queue"
 const WorkflowID = "demo-workflow"
 const QueryType = "GetWakeUpTime"
@@ -30,5 +32,22 @@ func Workflow(ctx workflow.Context, initialWakeUpTime time.Time) error {
 	ctx = workflow.WithActivityOptions(ctx, ao)
 	future := workflow.ExecuteActivity(ctx, a.Main)
 	err = future.Get(ctx, nil)
+	return err
+}
+
+func DelayWorkflow(ctx workflow.Context, wakeUpTime time.Time) error {
+	logger := workflow.GetLogger(ctx)
+
+	timer := workflow.NewTimer(ctx, wakeUpTime.Sub(workflow.Now(ctx)))
+	workflow.NewSelector(ctx).AddFuture(timer, func(f workflow.Future) {}).Select(ctx)
+
+	logger.Info("wake up, execute activity")
+	var a *Activities
+	ao := workflow.ActivityOptions{
+		StartToCloseTimeout: time.Second,
+	}
+	ctx = workflow.WithActivityOptions(ctx, ao)
+	future := workflow.ExecuteActivity(ctx, a.Main)
+	err := future.Get(ctx, nil)
 	return err
 }

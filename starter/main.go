@@ -12,8 +12,16 @@ import (
 
 func main() {
 	var workflowID string
+	var disableUpdate bool
 	flag.StringVar(&workflowID, "w", workflow.WorkflowID, "workflow id")
+	flag.BoolVar(&disableUpdate, "d", false, "disable wake up time update")
 	flag.Parse()
+	var flow func(workflow.Context, time.Time) error
+	if disableUpdate {
+		flow = workflow.DelayWorkflow
+	} else {
+		flow = workflow.Workflow
+	}
 
 	c, err := client.Dial(client.Options{})
 	if err != nil {
@@ -26,7 +34,7 @@ func main() {
 		ID:        workflowID,
 	}
 	wakeUpTime := time.Now().Add(30 * time.Second)
-	we, err := c.ExecuteWorkflow(context.Background(), options, workflow.Workflow, wakeUpTime)
+	we, err := c.ExecuteWorkflow(context.Background(), options, flow, wakeUpTime)
 	if err != nil {
 		log.Fatal("unable to execute workflow ", err)
 	}
