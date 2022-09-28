@@ -39,6 +39,7 @@ func DelayWorkflow(ctx workflow.Context, wakeUpTime time.Time) error {
 	logger := workflow.GetLogger(ctx)
 
 	timer := workflow.NewTimer(ctx, wakeUpTime.Sub(workflow.Now(ctx)))
+	logger.Info("sleep...", "WakeUpTime", wakeUpTime)
 	workflow.NewSelector(ctx).AddFuture(timer, func(f workflow.Future) {}).Select(ctx)
 
 	logger.Info("wake up, execute activity")
