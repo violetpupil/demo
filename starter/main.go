@@ -2,17 +2,17 @@ package main
 
 import (
 	"context"
+	"demo/workflow"
 	"flag"
 	"log"
-
-	"demo/cancellation"
+	"time"
 
 	"go.temporal.io/sdk/client"
 )
 
 func main() {
 	var workflowID string
-	flag.StringVar(&workflowID, "w", cancellation.WorkflowID, "workflow id")
+	flag.StringVar(&workflowID, "w", workflow.WorkflowID, "workflow id")
 	flag.Parse()
 
 	c, err := client.Dial(client.Options{})
@@ -21,12 +21,14 @@ func main() {
 	}
 	defer c.Close()
 
-	we, err := c.ExecuteWorkflow(context.Background(), client.StartWorkflowOptions{
-		TaskQueue: cancellation.Queue,
+	options := client.StartWorkflowOptions{
+		TaskQueue: workflow.Queue,
 		ID:        workflowID,
-	}, cancellation.Workflow)
+	}
+	wakeUpTime := time.Now().Add(30 * time.Second)
+	we, err := c.ExecuteWorkflow(context.Background(), options, workflow.Workflow, wakeUpTime)
 	if err != nil {
 		log.Fatal("unable to execute workflow ", err)
 	}
-	log.Printf("started workflow id %s run id %s", we.GetID(), we.GetRunID())
+	log.Printf("started workflow id %s run id %s, execute time %v", we.GetID(), we.GetRunID(), wakeUpTime)
 }
