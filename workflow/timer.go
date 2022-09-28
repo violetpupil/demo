@@ -11,8 +11,8 @@ import (
 // The wake-up time can be updated by channel.
 // Inner timer will be replace with new when update.
 type UpdatableTimer struct {
+	Logger      log.Logger
 	wakeUpTime  time.Time
-	logger      log.Logger
 	ctx         workflow.Context
 	timerCtx    workflow.Context
 	timerCancel workflow.CancelFunc
@@ -30,8 +30,8 @@ func (u *UpdatableTimer) SleepUntil(
 ) {
 	u.ctx = ctx
 	u.wakeUpTime = initialWakeUpTime
-	if u.logger == nil {
-		u.logger = workflow.GetLogger(ctx)
+	if u.Logger == nil {
+		u.Logger = workflow.GetLogger(ctx)
 	}
 
 	// loop until timer fired or workflow is canceled
@@ -40,7 +40,7 @@ func (u *UpdatableTimer) SleepUntil(
 		u.timerCtx, u.timerCancel = workflow.WithCancel(ctx)
 		duration := u.wakeUpTime.Sub(workflow.Now(u.timerCtx))
 		timer := workflow.NewTimer(u.timerCtx, duration)
-		u.logger.Info("sleep...", "WakeUpTime", u.wakeUpTime)
+		u.Logger.Info("sleep...", "WakeUpTime", u.wakeUpTime)
 
 		// block select one of processes
 		workflow.NewSelector(u.timerCtx).
@@ -57,10 +57,10 @@ func (u *UpdatableTimer) SleepUntil(
 func (u *UpdatableTimer) setTimerFired(f workflow.Future) {
 	err := f.Get(u.timerCtx, nil)
 	if err == nil {
-		u.logger.Info("timer fired")
+		u.Logger.Info("timer fired")
 		u.timerFired = true
 	} else if u.ctx.Err() != nil {
-		u.logger.Info("workflow is canceled")
+		u.Logger.Info("workflow is canceled")
 	}
 }
 
@@ -69,5 +69,5 @@ func (u *UpdatableTimer) updateWakeUpTime(c workflow.ReceiveChannel, more bool) 
 	// only cancel timer context
 	u.timerCancel()
 	c.Receive(u.timerCtx, &u.wakeUpTime)
-	u.logger.Info("wake up time updated")
+	u.Logger.Info("wake up time updated")
 }
