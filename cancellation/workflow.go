@@ -25,6 +25,7 @@ func Workflow(ctx workflow.Context) error {
 
 	defer func() {
 		if !errors.Is(ctx.Err(), workflow.ErrCanceled) {
+			logger.Error("workflow context", "error", ctx.Err())
 			return
 		}
 		newCtx, _ := workflow.NewDisconnectedContext(ctx)
