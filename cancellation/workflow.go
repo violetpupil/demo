@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -15,6 +16,7 @@ func Workflow(ctx workflow.Context) error {
 		StartToCloseTimeout: 30 * time.Minute,
 		HeartbeatTimeout:    5 * time.Second,
 		WaitForCancellation: true,
+		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 	logger := workflow.GetLogger(ctx)
