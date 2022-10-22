@@ -19,7 +19,7 @@ func (a *Activities) Main(ctx context.Context) (string, error) {
 			activity.RecordHeartbeat(ctx)
 		case <-ctx.Done():
 			logger.Info("context is canceled", "error", ctx.Err())
-			return "I am canceled by Done", nil
+			return "I am canceled by Done", ctx.Err()
 		}
 	}
 }

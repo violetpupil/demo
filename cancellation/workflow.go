@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -12,7 +12,32 @@ import (
 const Queue = "cancellation"
 const WorkflowID = "cancellation-workflow"
 
+func GetExecuteLogger(ctx workflow.Context, activity string) log.Logger {
+	logger := workflow.GetLogger(ctx)
+	return log.With(logger, "Activity", activity)
+}
+
 func Workflow(ctx workflow.Context) error {
+	logger := workflow.GetLogger(ctx)
+	logger.Info("workflow started")
+	ExecuteMain(ctx)
+	if errors.Is(ctx.Err(), workflow.ErrCanceled) {
+		logger.Info("workflow canceled")
+	} else if ctx.Err() != nil {
+		logger.Error("workflow error", "Error", ctx.Err())
+	} else {
+		logger.Info("workflow complete")
+	}
+	return nil
+}
+
+func ExecuteMain(ctx workflow.Context) {
+	// prepare
+	logger := GetExecuteLogger(ctx, "main")
+	logger.Info("execute activity")
+	var a *Activities
+
+	// execute
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Minute,
 		HeartbeatTimeout:    5 * time.Second,
@@ -20,36 +45,45 @@ func Workflow(ctx workflow.Context) error {
 		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
-	logger := workflow.GetLogger(ctx)
-	logger.Info("workflow started")
-	var a *Activities
-
-	defer func() {
-		if !errors.Is(ctx.Err(), workflow.ErrCanceled) {
-			logger.Error("workflow context", "error", ctx.Err())
-			return
-		}
-		newCtx, _ := workflow.NewDisconnectedContext(ctx)
-		err := workflow.ExecuteActivity(newCtx, a.Cleanup).Get(ctx, nil)
-		if err != nil {
-			logger.Error("cleanup activity error", "error", err)
-		}
-	}()
-
 	var result string
 	err := workflow.ExecuteActivity(ctx, a.Main).Get(ctx, &result)
 
-	var errTimeout = new(temporal.TimeoutError)
-	ok := errors.As(err, &errTimeout)
-	if ok && errTimeout.TimeoutType() == enums.TIMEOUT_TYPE_HEARTBEAT {
-		logger.Error("main activity heartbeat timeout", "error", errTimeout)
+	// process get return
+	actualError := errors.Unwrap(err)
+	switch actualError.(type) {
+	case *temporal.TimeoutError:
+		logger.Error("activity error, timeout", "Error", err)
+	case *temporal.CanceledError:
+		logger.Error("activity error, canceled", "Error", err)
+	case *temporal.ApplicationError:
+		logger.Error("activity error, application", "Error", err)
+	case *temporal.PanicError:
+		logger.Error("activity error, panic", "Error", err)
+	case nil:
+		logger.Info("activity complete", "Result", result)
+	default:
+		logger.Error("activity error, unknown", "Error", err)
 	}
+	ExecuteCleanup(ctx)
+}
 
-	if err != nil {
-		logger.Error("main activity error", "error", err)
-		return err
+func ExecuteCleanup(ctx workflow.Context) {
+	// prepare
+	logger := GetExecuteLogger(ctx, "cleanup")
+	logger.Info("execute activity")
+	var a *Activities
+
+	// execute
+	ao := workflow.ActivityOptions{
+		StartToCloseTimeout: 30 * time.Minute,
+		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
 	}
-	logger.Info("main activity result", "result", result)
-	logger.Info("workflow complete")
-	return nil
+	ctx = workflow.WithActivityOptions(ctx, ao)
+	ctx, _ = workflow.NewDisconnectedContext(ctx)
+	err := workflow.ExecuteActivity(ctx, a.Cleanup).Get(ctx, nil)
+	if err != nil {
+		logger.Error("activity error", "Error", err)
+	} else {
+		logger.Info("activity complete")
+	}
 }
